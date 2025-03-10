@@ -6,9 +6,9 @@ namespace XInputDotNetPure {
     class Imports {
         internal const string DLLName = "XInputInterface";
 
-        [DllImport("C:\\Users\\grant\\OneDrive\\Desktop\\Code Projects\\DynamixelSDK-master\\c#\\RoboticArm\\XInputInterface.dll")]
+        [DllImport("C:/Users/grant/Desktop/Code-Projects/RobotArm/XInputInterface.dll")]
         public static extern uint XInputGamePadGetState(uint playerIndex, out GamePadState.RawState state);
-        [DllImport("C:\\Users\\grant\\OneDrive\\Desktop\\Code Projects\\DynamixelSDK-master\\c#\\RoboticArm\\XInputInterface.dll")]
+        [DllImport("C:/Users/grant/Desktop/Code-Projects/RobotArm/XInputInterface.dll")]
         public static extern void XInputGamePadSetState(uint playerIndex, float leftMotor, float rightMotor);
     }
 

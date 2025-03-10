@@ -26,7 +26,7 @@ namespace read_write {
         public int dxl_comm_result = COMM_TX_FAIL;
         public int port_num;
 
-        public int[] servoPos = new int[8];
+        public int[] servoPos = new int[10];
 
         byte dxl_error = 0;
 
@@ -57,9 +57,11 @@ namespace read_write {
                 Console.ReadKey();
                 return;
             }
-            for (int i = 0; i < 8; i++) {
+            for (int i = 1; i <= 8; i++) {
                 servoPos[i] = (int)dynamixel.read2ByteTxRx(port_num, PROTOCOL_VERSION, (byte)i, 132);
+                Console.WriteLine("Servo Position " + i + " is: " + servoPos[i]);
             }
+            servoPos[9] = 3000;
         }
         public void EnableTorque() {
             for (int i = 1; i <= 9; i++) {
@@ -86,6 +88,20 @@ namespace read_write {
                     Console.WriteLine(Marshal.PtrToStringAnsi(dynamixel.getRxPacketError(PROTOCOL_VERSION, dxl_error)));
                 } else {
                     Console.WriteLine("Dynamixel has successfully shutdown motor " + i);
+                }
+            }
+        }
+        public void RestartMotors() {
+            for (int i = 1; i <= 9; i++) {
+                dynamixel.ping(port_num, PROTOCOL_VERSION, (byte)i);
+                // Enable Dynamixel Torque
+                dynamixel.reboot(port_num, PROTOCOL_VERSION, (byte)i);
+                if ((dxl_comm_result = dynamixel.getLastTxRxResult(port_num, PROTOCOL_VERSION)) != COMM_SUCCESS) {
+                    Console.WriteLine(Marshal.PtrToStringAnsi(dynamixel.getTxRxResult(PROTOCOL_VERSION, dxl_comm_result)));
+                } else if ((dxl_error = dynamixel.getLastRxPacketError(port_num, PROTOCOL_VERSION)) != 0) {
+                    Console.WriteLine(Marshal.PtrToStringAnsi(dynamixel.getRxPacketError(PROTOCOL_VERSION, dxl_error)));
+                } else {
+                    Console.WriteLine("Dynamixel has successfully rebooted motor " + i);
                 }
             }
         }
