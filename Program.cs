@@ -1,6 +1,5 @@
 ﻿using dynamixel_sdk;
 using XInputDotNetPure;
-using System.Windows.Input;
 
 namespace read_write {
     internal class RobotArm {
@@ -12,6 +11,7 @@ namespace read_write {
 
         public const int COMM_SUCCESS = 0;
         public const int COMM_TX_FAIL = -1001;
+        public const int PROTOCOL_VERSION = 2;
 
         public static readonly byte[] SHOULDER_SERVOS = { 1, 2, 3 };
         public static readonly byte[] ELBOW_SERVOS = { 4, 5 };
@@ -24,95 +24,114 @@ namespace read_write {
         static void Main(string[] args) {
             Console.WriteLine("//////////////Arm_Init/////////////");
             PORT_NUM = dynamixel.portHandler(PORT);
-            BULK_WRITE_MOVE = dynamixel.groupSyncWrite(PORT_NUM, ClawUtils.PROTOCOL_VERSION, GOAL_POSITION_ADRESS, LEN_GOAL_POSITION);
-            ArmInitialiser RobotInitialiser = new ArmInitialiser(BAUDRATE, PORT, BULK_WRITE_MOVE);
-            ClawUtils Arm = new ClawUtils(BAUDRATE, PORT, BULK_WRITE_MOVE);
-            RobotInitialiser.EnableTorque();
-            SERVO_POS = RobotInitialiser.servoPos;
-            int dxl_comm_result = COMM_TX_FAIL;
+            BULK_WRITE_MOVE = dynamixel.groupSyncWrite(PORT_NUM, PROTOCOL_VERSION, GOAL_POSITION_ADRESS, LEN_GOAL_POSITION);
+
+            ArmInitialiser ArmInitialiser = new ArmInitialiser(BAUDRATE, PORT, BULK_WRITE_MOVE);
+            ArmInitialiser.EnableTorque();
+            dynamixel.write4ByteTxRx(PORT_NUM, 2, RobotArm.CLAW_SERVO, 116, 3000);
+            Console.WriteLine("Claw Opened");
+
+            SERVO_POS = ArmInitialiser.servoPos;
             Console.WriteLine("Arm Init Sucessful!");
 
             Console.WriteLine("////////////GamePad_Init////////////");
             GamePad gamePad = new GamePad();
             GamePadState state = GamePad.GetState(PlayerIndex.One);
             Console.WriteLine("IsConnected {0} Packet #{1}", state.IsConnected, state.PacketNumber);
-            if (state.IsConnected == false) { 
+            if (state.IsConnected == false) {
                 Console.WriteLine("ERROR: Controller not connected, please ensure it is connected and try again");
-                RobotInitialiser.DisableTorque();
-                return; 
+                ArmInitialiser.DisableTorque();
+                return;
             }
             Console.WriteLine("GamePad Functioning!");
 
-            ushort LStickX = 0;
-            ushort LStickY = 0;
-            ushort RStickX = 0;
-            ushort RStickY = 0;
-
             while (true) {
                 state = GamePad.GetState(PlayerIndex.One);
-                if (state.Buttons.X == ButtonState.Pressed) {
+
+                if (state.Buttons.A == ButtonState.Pressed) {
+                    ArmInitialiser.RestartMotors();
                     break;
                 }
-                if (state.Buttons.LeftShoulder == ButtonState.Pressed) {
-                    Arm.OpenClaw();
+
+                if (state.Buttons.X == ButtonState.Pressed) { break; }
+
+                if (state.ThumbSticks.Left.X != 0) {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[2], (uint)(SERVO_POS[WRIST_SERVOS[2]] + (state.ThumbSticks.Left.X * 100)), LEN_GOAL_POSITION);
+                    SERVO_POS[WRIST_SERVOS[2]] = (int)(SERVO_POS[WRIST_SERVOS[2]] + (state.ThumbSticks.Left.X * 100));
+                    Console.WriteLine("LStickX: " + state.ThumbSticks.Left.X);
                 }
 
-                if (state.Buttons.RightShoulder == ButtonState.Pressed) {
-                    Arm.CloseClaw();
-                }
-                if (state.ThumbSticks.Left.X > LStickX || state.ThumbSticks.Left.X < LStickX) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[2], (uint)(SERVO_POS[7] + (state.ThumbSticks.Left.X * 100)), LEN_GOAL_POSITION);
-                    SERVO_POS[7] = (int)(SERVO_POS[7] + (state.ThumbSticks.Left.X * 100));
-                }
-
-                if (state.ThumbSticks.Left.Y > LStickY || state.ThumbSticks.Left.Y < LStickY) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[1], (uint)(SERVO_POS[6] + (state.ThumbSticks.Left.Y * 70)), LEN_GOAL_POSITION);
-                    SERVO_POS[6] = (int)(SERVO_POS[6] + (state.ThumbSticks.Left.Y * 70));
+                if (state.ThumbSticks.Left.Y != 0) {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[1], (uint)(SERVO_POS[WRIST_SERVOS[1]] + (state.ThumbSticks.Left.Y * 70)), LEN_GOAL_POSITION);
+                    SERVO_POS[WRIST_SERVOS[1]] = (int)(SERVO_POS[WRIST_SERVOS[1]] + (state.ThumbSticks.Left.Y * 70));
+                    Console.WriteLine("LStickY: " + state.ThumbSticks.Left.Y);
                 }
 
                 if (state.DPad.Left == ButtonState.Pressed) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[0], (uint)(SERVO_POS[5] + 70), LEN_GOAL_POSITION);
-                    SERVO_POS[5] = (int)(SERVO_POS[5] + 70);
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[0], (uint)(SERVO_POS[WRIST_SERVOS[0]] + 70), LEN_GOAL_POSITION);
+                    SERVO_POS[WRIST_SERVOS[0]] = (int)(SERVO_POS[WRIST_SERVOS[0]] + 70);
+                    Console.WriteLine("DPad Left Pressed");
                 }
+
                 if (state.DPad.Right == ButtonState.Pressed) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[0], (uint)(SERVO_POS[5] - 70), LEN_GOAL_POSITION);
-                    SERVO_POS[5] = (int)(SERVO_POS[5] - 70);
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, WRIST_SERVOS[0], (uint)(SERVO_POS[WRIST_SERVOS[0]] - 70), LEN_GOAL_POSITION);
+                    SERVO_POS[WRIST_SERVOS[0]] = (int)(SERVO_POS[WRIST_SERVOS[0]] - 70);
+                    Console.WriteLine("DPad Right Pressed");
                 }
 
                 if (state.DPad.Down == ButtonState.Pressed) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[0], (uint)(SERVO_POS[4] + 40), LEN_GOAL_POSITION);
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[1], (uint)(SERVO_POS[3] + 40), LEN_GOAL_POSITION);
-                    SERVO_POS[4] = (int)(SERVO_POS[4] + 40);
-                    SERVO_POS[3] = (int)(SERVO_POS[3] + 40);
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[0], (uint)(SERVO_POS[ELBOW_SERVOS[0]] + 15), LEN_GOAL_POSITION);
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[1], (uint)(SERVO_POS[ELBOW_SERVOS[1]] - 15), LEN_GOAL_POSITION);
+                    SERVO_POS[ELBOW_SERVOS[0]] = (int)(SERVO_POS[ELBOW_SERVOS[0]] + 15);
+                    SERVO_POS[ELBOW_SERVOS[1]] = (int)(SERVO_POS[ELBOW_SERVOS[1]] - 15);
+                    Console.WriteLine("DPad Down Pressed");
                 }
+
                 if (state.DPad.Up == ButtonState.Pressed) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[0], (uint)(SERVO_POS[4] - 40), LEN_GOAL_POSITION);
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[1], (uint)(SERVO_POS[3] - 40), LEN_GOAL_POSITION);
-                    SERVO_POS[4] = (int)(SERVO_POS[4] - 40);
-                    SERVO_POS[3] = (int)(SERVO_POS[3] - 40);
-                } else {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[0], (uint)(SERVO_POS[ELBOW_SERVOS[0]] - 15), LEN_GOAL_POSITION);
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, ELBOW_SERVOS[1], (uint)(SERVO_POS[ELBOW_SERVOS[1]] + 15), LEN_GOAL_POSITION);
+                    SERVO_POS[ELBOW_SERVOS[0]] = (int)(SERVO_POS[ELBOW_SERVOS[0]] - 15);
+                    SERVO_POS[ELBOW_SERVOS[1]] = (int)(SERVO_POS[ELBOW_SERVOS[1]] + 15);
+                    Console.WriteLine("DPad Up  Pressed");
                 }
 
-                if (state.ThumbSticks.Right.Y > RStickY || state.ThumbSticks.Right.Y < RStickY) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, SHOULDER_SERVOS[2], (uint)(SERVO_POS[2] + (state.ThumbSticks.Right.Y * 70)), LEN_GOAL_POSITION);
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, SHOULDER_SERVOS[1], (uint)(SERVO_POS[1] + (state.ThumbSticks.Right.Y * 70)), LEN_GOAL_POSITION);
-                    SERVO_POS[2] = (int)(SERVO_POS[2] + (state.ThumbSticks.Right.Y * 70));
-                    SERVO_POS[1] = (int)(SERVO_POS[1] + (state.ThumbSticks.Right.Y * 70));
+                if (state.ThumbSticks.Right.Y != 0) {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, SHOULDER_SERVOS[2], (uint)(SERVO_POS[2] + (state.ThumbSticks.Right.Y * 25)), LEN_GOAL_POSITION);
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, SHOULDER_SERVOS[1], (uint)(SERVO_POS[1] + (state.ThumbSticks.Right.Y * 25)), LEN_GOAL_POSITION);
+                    SERVO_POS[2] = (int)(SERVO_POS[2] + (state.ThumbSticks.Right.Y * 25));
+                    SERVO_POS[1] = (int)(SERVO_POS[1] + (state.ThumbSticks.Right.Y * 25));
+                    Console.WriteLine("RStickY: " + state.ThumbSticks.Right.Y);
                 }
 
-                if (state.ThumbSticks.Right.X > RStickX || state.ThumbSticks.Right.X < RStickX) {
-                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, SHOULDER_SERVOS[0], (uint)(SERVO_POS[0] + (state.ThumbSticks.Right.X * 70)), LEN_GOAL_POSITION);
-                    SERVO_POS[0] = (int)(SERVO_POS[0] + (state.ThumbSticks.Right.X * 70));
+                if (state.ThumbSticks.Right.X != 0) {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, SHOULDER_SERVOS[0], (uint)(SERVO_POS[SHOULDER_SERVOS[0]] + (state.ThumbSticks.Right.X * 25)), LEN_GOAL_POSITION);
+                    SERVO_POS[SHOULDER_SERVOS[0]] = (int)(SERVO_POS[SHOULDER_SERVOS[0]] + (state.ThumbSticks.Right.X * 25));
+                    Console.WriteLine("RStickX: " + state.ThumbSticks.Right.X);
                 }
+
+                if (state.Buttons.RightShoulder == ButtonState.Pressed && SERVO_POS[CLAW_SERVO] <= 3000) {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, CLAW_SERVO, (uint)(SERVO_POS[CLAW_SERVO] + 10), LEN_GOAL_POSITION);
+                    SERVO_POS[CLAW_SERVO] = (int)(SERVO_POS[CLAW_SERVO] + 20);
+                    Console.WriteLine("Right Shoulder Pressed");
+                }
+
+                if (state.Buttons.LeftShoulder == ButtonState.Pressed && SERVO_POS[CLAW_SERVO] >= 1810) {
+                    dynamixel.groupSyncWriteAddParam(BULK_WRITE_MOVE, CLAW_SERVO, (uint)(SERVO_POS[CLAW_SERVO] - 10), LEN_GOAL_POSITION);
+                    SERVO_POS[CLAW_SERVO] = (int)(SERVO_POS[CLAW_SERVO] - 20);
+                    Console.WriteLine("Left Shoulder Pressed");
+                }
+
                 dynamixel.groupSyncWriteTxPacket(BULK_WRITE_MOVE);
-                if ((dxl_comm_result = dynamixel.getLastTxRxResult(PORT_NUM, ClawUtils.PROTOCOL_VERSION)) != COMM_SUCCESS) {
-                    dynamixel.printTxRxResult(ClawUtils.PROTOCOL_VERSION, dxl_comm_result);
+                if (dynamixel.getLastTxRxResult(PORT_NUM, PROTOCOL_VERSION) == COMM_TX_FAIL) {
+                    Console.WriteLine("Failed to process request!");
+                    return;
                 }
+
                 dynamixel.groupSyncWriteClearParam(BULK_WRITE_MOVE);
-                Thread.Sleep(100);
+                Thread.Sleep(20);
             }
             Console.WriteLine("Detorquing motors");
-            RobotInitialiser.DisableTorque();
+            ArmInitialiser.DisableTorque();
             return;
         }
     }
